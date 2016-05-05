@@ -130,7 +130,7 @@ void loop() {
     Serial.print(" %\t");
     Serial.print("Temp : ");
     Serial.print(outhouse.airTemp * .01);
-    Serial.print(" C\t");
+    Serial.print(" F\t");
     Serial.print(" Battery ");
     Serial.print(outhouse.battery * 0.001);
 #endif
