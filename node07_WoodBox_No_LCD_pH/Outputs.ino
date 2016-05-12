@@ -1,7 +1,7 @@
 /*
  * This section controls the relays which controls the various
  * output devices.  The functions will turn off or on the device
- * based on the start/stop times set up in the <AlarmSetup> tab.
+ * based on the start/stop times set up in the <Timers> tab.
  * The functions will also log the last operation to the serial
  * port.  I/O is thru the MPC23017 devices, exp26.
  *
