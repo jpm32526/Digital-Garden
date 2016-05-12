@@ -1,4 +1,17 @@
+/*
+ * 
+ * This section of code is based on code from the PracticalMaker.
+ * The website is no longer active, and it's a shame 'cause he had
+ * some really good products and code.
+ * 
+ * Rewoking the code to use EEPROM.get and .put to fetch and store
+ * a struct which contains the calibration values.
+ * 
+ * Calibration currently disabled while rework in progress.
+ * 
+ */
 
+ 
 int highValue(int value)
 {
   return value / 256;
