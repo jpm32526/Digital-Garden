@@ -10,7 +10,8 @@
  * Remapped I/O for distributed outputs 03/26/12
  *
  * TODO: Switching times to be controlled by radio to run 12, 18, or 24 hrs per day.
- *
+ *       Clean up pH calibration routines
+ *       
  *                         System Schematic
  *
  *  -----------------------[ ATMega328 Pinout ]---------------------------
