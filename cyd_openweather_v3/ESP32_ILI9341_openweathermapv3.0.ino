@@ -4,7 +4,7 @@
 // for environmental conditions of (any) town
 // displays alphanumerically, with gauges and with icons
 //
-// updates every five minutes in Loop -  check the variable named timerDelay
+// updates every fifteen minutes in Loop -  check the variable named timerDelay
 //
 // microcontroller ESP32-WROOM-32
 // current display TFT 018  =  320*240 ILI9341 controller
@@ -18,11 +18,14 @@
 // July 6, 2021 - minor issues fixed, compass pointer fixed
 // Floris Wouterlood
 //
+// corrected a few errors in sub calls and updated to owm 3.0 api 01/25 JPM
+//
 // Make sure all the display driver and pin conections are correct by
 // editing the User_Setup.h file in the TFT_eSPI library folder.
 //
 // ######################################################################################
 // ######   DON'T FORGET TO UPDATE THE User_Setup.h FILE IN THE TFT_eSPI LIBRARY    #####
+// ######   ALSO PUT YOUR OPENWEATHERMAP KEY AND YOUR LAT/LON @ LINE 264            #####
 // ######################################################################################
 
 #include <TFT_eSPI.h>
@@ -42,9 +45,9 @@ TFT_eSPI tft = TFT_eSPI();
 #define MAGENTA 0xF81F
 #define YELLOW 0xFFE0
 #define GREY 0x2108
-#define SCALE0 0xC655      // accent color for unused scale segments
-#define SCALE1 0x5DEE      // accent color for unused scale segments
-#define TEXT_COLOR 0xFFFF  // is currently white
+#define SCALE0 0xC655                                // accent color for unused scale segments
+#define SCALE1 0x5DEE                                // accent color for unused scale segments
+#define TEXT_COLOR 0xFFFF                            // is currently white
 
 // rainbow scale ring meter color scheme
 #define RED2RED 0
@@ -57,16 +60,16 @@ TFT_eSPI tft = TFT_eSPI();
 #define DEG2RAD 0.0174532925  // conversion factor degrees to radials
 
 // data connection and acquisition variables
-const char* ssid = "aintmynetwrk";                                     // network wifi credentials
-const char* password = "random_password";                                 // wifi network key
-String openWeatherMapApiKey = "getyourownkeyitsfree";  // API Openweathermap account
+const char* ssid = "aintmynetwrk";                   // network wifi credentials
+const char* password = "random_password";            // wifi network key
+String openWeatherMapApiKey = "getyourownkeyitsfree";// API Openweathermap account
 String city = "notreallyneeded";
-String countryCode = "US";  // "NL" for The Netherlands
-String jsonDocument(1024);  // memory allocation json string
+String countryCode = "US";                           // "NL" for The Netherlands
+String jsonDocument(1024);                           // memory allocation json string
 
 // timer internet access for server download
-unsigned long lastTime = 0;  // testing purposes = 30 seconds
-unsigned long timerDelay;    // is set at 1 seconds in Setup and to 5 minutes in Loop
+unsigned long lastTime = 0;                          // testing purposes = 30 seconds
+unsigned long timerDelay;                            // is set at 1 seconds in Setup and to 5 minutes in Loop
 
 // joint variables
 float temp_01 = 10;
@@ -74,31 +77,31 @@ float hum_01;
 int hum_02;
 
 // rainbow scale ring meter variables
-uint32_t runTime = -99999;  // time for next update
-int reading = 10;           // value to be displayed in circular scale
+uint32_t runTime = -99999;                           // time for next update
+int reading = 10;                                    // value to be displayed in circular scale
 int tesmod = 0;
-int rGaugePos_x = 0;                            // these two variables govern the position
-int rGaugePos_y = 155;                          // of the square + gauge on the display
-int ringmeterRadius = 65;                       // governs diameter of rainbow gauge
-char* ringlabel[] = { "", "*F", "%", "mBar" };  // some custom labels
+int rGaugePos_x = 0;                                 // these two variables govern the position
+int rGaugePos_y = 155;                               // of the square + gauge on the display
+int ringmeterRadius = 65;                            // governs diameter of rainbow gauge
+char* ringlabel[] = { "", "*F", "%", "mBar" };       // some custom labels
 float tempRainbowgauge;
-int t = 40;  // governs position of numerical output rainbow scale
+int t = 40;                                          // governs position of numerical output rainbow scale
 
 // small needle meter
 int j;
-int pivotNeedle_x = 165;  // pivot coordinates needle of small gauge
+int pivotNeedle_x = 165;                             // pivot coordinates needle of small gauge
 int pivotNeedle_y = 222;
-float center_x1 = 160;     // center x of edge markers circle left gauge
-float center_y1 = 228;     // center y of edge markers circle left gauge
-int radius_s = 65;         // for scale markers
-int needleLength = 45;     // gauge needle length
-int edgemarkerLength = 5;  // edge marker length
+float center_x1 = 160;                               // center x of edge markers circle left gauge
+float center_y1 = 228;                               // center y of edge markers circle left gauge
+int radius_s = 65;                                   // for scale markers
+int needleLength = 45;                               // gauge needle length
+int edgemarkerLength = 5;                            // edge marker length
 float edge_x1, edge_y1, edge_x1_out, edge_y1_out;
 float angleNeedle = 0;
 float needle_x, needle_y;
 float needle_x_old, needle_y_old;
 float angleCircle = 0;
-int pivot_x = 165;  // pivot coordinates needle of small gauge
+int pivot_x = 165;                                   // pivot coordinates needle of small gauge
 int pivot_y = 222;
 
 // circle segment 'pie chart' meter variables
@@ -107,8 +110,8 @@ unsigned int col = 0;
 float pivotHumcircle__x = 198;
 float pivotHumcircle__y = 274;
 float startAngle = 0;
-float subAngle;  // subtended angle
-int r = 34;      // circle radius
+float subAngle;                                      // subtended angle
+int r = 34;                                          // circle radius
 
 // compass wind direction pointer
 float compassPivot_x = 158;
@@ -156,11 +159,9 @@ void setup() {
   Serial.println(WiFi.localIP());
   Serial.println("timer set to 30 seconds (timerDelay variable) - it will take 30 seconds before publishing the first reading.");
   delay(1000);
-  drawAllWindowFrames();  // instructions moved to subroutine
+  drawAllWindowFrames();                             // instructions moved to subroutine
   tft.setTextColor(TFT_YELLOW, BLACK);
-
   tft.setFreeFont(FF1);
-
   tft.setTextSize(1);
   tft.setCursor(21, 20);
   tft.print("Pensacola - OpenWx");
@@ -176,9 +177,9 @@ void setup() {
   tft.setCursor(10, 133);
   tft.print("from:");
 
-  tft.setFreeFont(FF0);  // note - units in Free Font 0 = text size 1
+  tft.setFreeFont(FF0);                              // note - units in Free Font 0 = text size 1
   tft.setCursor(133, 37);
-  tft.print(char(247));  // degree character
+  tft.print(char(247));                              // degree character
   tft.print("F");
   tft.setCursor(133, 59);
   tft.print("mB");
@@ -188,31 +189,31 @@ void setup() {
   tft.print("mph");
 
   tft.setCursor(10, 160);
-  tft.print("temp");  // in rainbow scale
+  tft.print("temp");                                 // in rainbow scale
 
-  tft.setCursor(125, 160);  // left upper corner = anchoring point of rainbow gauge scale
-  tft.print(char(247));     // degree character
+  tft.setCursor(125, 160);                           // left upper corner = anchoring point of rainbow gauge scale
+  tft.print(char(247));                              // degree character
   tft.setTextSize(2);
   tft.print("F");
   tft.setTextSize(1);
 
-  tft.setCursor(55, 290);  // 0  is bottom rainbow scale temperature
+  tft.setCursor(55, 290);                            // 0  is bottom rainbow scale temperature
   tft.print("0");
-  tft.setCursor(98, 290);  // 50 is top rainbow scale temperature
+  tft.setCursor(98, 290);                            // 100 is top rainbow scale temperature
   tft.print("100");
 
 
 
-  tft.setCursor(220, 160);  // display percent sign in  small gauge scale
+  tft.setCursor(220, 160);                           // display percent sign in  small gauge scale
   tft.print("%");
 
   drawSaleSmallGauge();
-  tft.fillCircle(pivot_x, pivot_y, 2, MAGENTA);   // pivot needle middle small gauge                                                                         // arbitrary seeding temp - avoids drawing black line from position 0.0
-  needleMeter();                                  // calculate position and draw the needle
-  tft.drawRoundRect(158, 150, 80, 80, 4, GREEN);  // correction right middle small frame from buildup needle
+  tft.fillCircle(pivot_x, pivot_y, 2, MAGENTA);      // pivot needle middle small gauge                                                                         // arbitrary seeding temp - avoids drawing black line from position 0.0
+  needleMeter();                                     // calculate position and draw the needle
+  tft.drawRoundRect(158, 150, 80, 80, 4, GREEN);     // correction right middle small frame from buildup needle
   tft.setCursor(216, 217);
   tft.setTextSize(1);
-  tft.print("40");  // scale starts with 40% and ends with 100%
+  tft.print("40");                                   // scale starts with 40% and ends with 100%
   tft.setCursor(164, 169);
   tft.print("100");
   tft.setTextSize(2);
@@ -228,22 +229,20 @@ void setup() {
   tft.print("v1.1 - JPM");
   tft.setTextColor(TFT_WHITE);
 
-  timerDelay = 1000;  // this is for fast initial query OpenWeather server for json string
-  doTheHardWork();    // run this here - in void loop the timerDelay refreshes every 15 minutes
-  drawAllWindowFrames();  // drawover to correct for all drawing errors caused by needles and markers
-  rainbowScaleMeter();    // prepare the rainbow scale meter
-  needleMeter();          // prepare the middle right, small meter with the needle
-  circleSegmentMeter();   // prepare the circle segment pie meter
-  compassGauge();         // prepare the wind compass meter
-  compassPointer();       // add pointer to the wind compass meter
-  windSectorReporter();   // add wind sector reporter
-
-  //  Serial.println ("Setup complete");
+  timerDelay = 1000;                                 // this is for fast initial query OpenWeather server for json string
+  doTheHardWork();                                   // run this here - in void loop the timerDelay refreshes every 15 minutes
+  drawAllWindowFrames();                             // drawover to correct for all drawing errors caused by needles and markers
+  rainbowScaleMeter();                               // prepare the rainbow scale meter
+  needleMeter();                                     // prepare the middle right, small meter with the needle
+  circleSegmentMeter();                              // prepare the circle segment pie meter
+  compassGauge();                                    // prepare the wind compass meter
+  compassPointer();                                  // add pointer to the wind compass meter
+  windSectorReporter();                              // add wind sector reporter
 }
 
 void loop() {
 
-  timerDelay = 900000;  // connect to OpenWeather and refresh every 15 minutes
+  timerDelay = 900000;    // connect to OpenWeather and refresh every 15 minutes
   doTheHardWork();
 }
 
@@ -254,15 +253,18 @@ void loop() {
 
 
 void doTheHardWork() {
-  //Serial.println ("Start hard work...");           // buncha prints for troubleshooting.
-  // Send an HTTP GET request                        // guy started out strong but fumbled
-  if ((millis() - lastTime) > timerDelay) {          // the functions, no return statements.
-    // Check WiFi connection status                  // so program had no return from function.  
-    if (WiFi.status() == WL_CONNECTED) {             // changed to voids and also v3.0 for owm.
-      String serverPath = "https://api.openweathermap.org/data/3.0/onecall?lat=0.0&lon=0.0&exclude=minutely,hourly,daily&units=imperial&appid=d004803e60417a6092c3c7278632beb3";
+  // Send an HTTP GET request                        
+  if ((millis() - lastTime) > timerDelay) { 
+    // Check WiFi connection status  
+    if (WiFi.status() == WL_CONNECTED) { 
+// #######################################################################################
+// #              Insert your lat/lon values and your owm key here                       #
+// #                  Get your key at openweathermap.org                                 #
+// #######################################################################################
+      String serverPath = "https://api.openweathermap.org/data/3.0/onecall?lat=0.0&lon=0.0&exclude=minutely,hourly,daily&units=imperial&appid=yourownkeygoeshere";
       jsonDocument = httpGETRequest(serverPath.c_str());
-      JSONVar myObject = JSON.parse(jsonDocument);  // JSON.typeof(jsonVar) can be used to get the type of the var
-      Serial.println(JSON.typeof(myObject));        // prints: object
+      JSONVar myObject = JSON.parse(jsonDocument);   // JSON.typeof(jsonVar) can be used to get the type of the var
+      Serial.println(JSON.typeof(myObject));         // prints: object
       double temp_01 = (myObject["current"]["temp"]);
       double hum_01 = (myObject["current"]["humidity"]);
 
@@ -302,7 +304,7 @@ void doTheHardWork() {
 
       // print some json data in upper window of the display
 
-      //temp_01 = temp_01;                                 // convert temp from Kelvin to Celsius
+      //temp_01 = temp_01;                           // convert temp from Kelvin to Celsius
       tempRainbowgauge = temp_01;
       hum_02 = hum_01;
 
@@ -314,7 +316,7 @@ void doTheHardWork() {
       Serial.println(" °F");
       Serial.println("");
 
-      tft.setFreeFont(FF1);  // start display data representation
+      tft.setFreeFont(FF1);                          // start display data representation
 
       tft.fillRect(60, 35, 70, 15, BLACK);
       tft.setCursor(72, 45);
@@ -334,36 +336,33 @@ void doTheHardWork() {
       tft.print(ws);
 
       tft.fillRect(65, 121, 40, 15, BLACK);
-      tft.setCursor(72, 133);  // was 78
-      tft.print(sector[h]);    // wind sector
+      tft.setCursor(72, 133);                        // was 78
+      tft.print(sector[h]);                          // wind sector
 
-      tft.setFreeFont(FF0);  // end display numerical data representation
+      tft.setFreeFont(FF0);                          // end display numerical data representation
       rainbowScaleMeter();
-      needleMeter();         // calculate needle position middle right, small meter
-      circleSegmentMeter();  // calculate and display the pie chart
-                             //   Serial.println ("circle segment complete");
+      needleMeter();                                 // calculate needle position middle right, small meter
+      circleSegmentMeter();                          // calculate and display the pie chart
     } else {
       Serial.println("WiFi Disconnected");
     }
     lastTime = millis();
-  }  //Serial.println ("...hard work complete");
+  }
 }
 
 // ######################################################################################
-// #  draw window frames                                                                #
+// #  draw all window frames                                                                #
 // ######################################################################################
 
 void drawAllWindowFrames() {
-  //Serial.print( "Begin drawAllWindowFrames");
-  tft.drawRoundRect(4, 2, 234, 25, 4, GREEN);     // title frame
-  tft.drawRoundRect(4, 28, 150, 118, 4, GREEN);   // left upper numerical window
-  tft.drawRoundRect(4, 150, 150, 165, 4, GREEN);  // left lower (big) frame for rainbow scale gauge
-  tft.drawRoundRect(158, 150, 80, 80, 4, GREEN);  // right middle small frame - needle meter
+  tft.drawRoundRect(4, 2, 234, 25, 4, GREEN);        // title frame
+  tft.drawRoundRect(4, 28, 150, 118, 4, GREEN);      // left upper numerical window
+  tft.drawRoundRect(4, 150, 150, 165, 4, GREEN);     // left lower (big) frame for rainbow scale gauge
+  tft.drawRoundRect(158, 150, 80, 80, 4, GREEN);     // right middle small frame - needle meter
   tft.drawRoundRect(158, 235, 80, 80, 4, GREEN);
-  tft.drawRoundRect(158, 65, 80, 81, 4, GREEN);  // compass frame
-  tft.drawRoundRect(158, 47, 80, 16, 4, GREEN);  // wind sector indicator frame
-  tft.drawRoundRect(158, 28, 80, 16, 4, GREEN);  // version window
-  // Serial.println( "...End drawAllWindowFrames");
+  tft.drawRoundRect(158, 65, 80, 81, 4, GREEN);      // compass frame
+  tft.drawRoundRect(158, 47, 80, 16, 4, GREEN);      // wind sector indicator frame
+  tft.drawRoundRect(158, 28, 80, 16, 4, GREEN);      // version window
 }
 
 
@@ -372,10 +371,9 @@ void drawAllWindowFrames() {
 // ######################################################################################
 
 String httpGETRequest(const char* serverName) {
-  //Serial.println( "Begin httpGETRequest");
   HTTPClient http;
-  http.begin(serverName);             // your IP address with path or Domain name with URL path
-  int httpResponseCode = http.GET();  // send HTTP POST request
+  http.begin(serverName);                            // your IP address with path or Domain name with URL path
+  int httpResponseCode = http.GET();                 // send HTTP POST request
   String payload = "{}";
   if (httpResponseCode > 0) {
     Serial.print("HTTP Response code: ");
@@ -385,8 +383,7 @@ String httpGETRequest(const char* serverName) {
     Serial.print("Error code: ");
     Serial.println(httpResponseCode);
   }
-  http.end();  // free microcontroller resources
-               //  Serial.println( "...End httpGETRequest");
+  http.end();                                        // free microcontroller resources
   return payload;
 }
 
@@ -396,62 +393,59 @@ String httpGETRequest(const char* serverName) {
 // ######################################################################################
 
 void rainbowScaleMeter() {
-  //Serial.print("Begin rainbowScaleMeter   ");
-  if (millis() - runTime >= 100)  // originally 500 = delay
+  if (millis() - runTime >= 100)                     // originally 500 = delay
   {
     runTime = millis();
     if (tesmod == 0) {
       reading = 99;
     }
     if (tesmod == 1) {
-      reading = tempRainbowgauge * 2;  // important: here ring is seeded with value
+      reading = tempRainbowgauge * 2;                // important: here ring is seeded with value
     }
-    // Serial.print (reading);
-    int xpos = 10, ypos = 240, gap = 100;  // position of upper ring and proportion
+
+    int xpos = 10, ypos = 240, gap = 100;            // position of upper ring and proportion
 
     ringMeter(reading, 0, 100, (rGaugePos_x + 15), (rGaugePos_y + 17), ringmeterRadius, ringlabel[0], GREEN2RED);
     tesmod = 1;
-    //       Serial.print ("   tesmod = "); Serial.print(tesmod);
   }
-  //  Serial.println ("...End rainbowScaleMeter");
 }
 
 
 // ######################################################################################
-// #  rainbow scale: draw the rainbox ring meter, returns x coord of righthand side     #
+// #  rainbow scale: draw the rainbox ring meter, sets x coord of righthand side        #
 // ######################################################################################
 
 void ringMeter(int value, int vmin, int vmax, int x, int y, int r, char* units, byte scheme) {
   // Minimum value of r is about 52 before value text intrudes on ring
   // drawing the text first is an option
-  //Serial.println (" Begin ringMeter");
+
   x += r;
-  y += r;                                         // calculate coordinates of center of ring
-  int w = r / 3;                                  // width of outer ring is 1/4 of radius
-  int angle = 150;                                // half the sweep angle of the meter (300 degrees)
-  int v = map(value, vmin, vmax, -angle, angle);  // map the value to an angle v
-  byte seg = 3;                                   // segments are 3 degrees wide = 100 segments for 300 degrees
-  byte inc = 6;                                   // draw segments every 3 degrees, increase to 6 for segmented ring
-  int colour = BLUE;                              // variable to save "value" text color from scheme and set default
+  y += r;                                            // calculate coordinates of center of ring
+  int w = r / 3;                                     // width of outer ring is 1/4 of radius
+  int angle = 150;                                   // half the sweep angle of the meter (300 degrees)
+  int v = map(value, vmin, vmax, -angle, angle);     // map the value to an angle v
+  byte seg = 3;                                      // segments are 3 degrees wide = 100 segments for 300 degrees
+  byte inc = 6;                                      // draw segments every 3 degrees, increase to 6 for segmented ring
+  int colour = BLUE;                                 // variable to save "value" text color from scheme and set default
 
 
   for (int i = -angle + inc / 2; i < angle - inc / 2; i += inc)  // draw color blocks every increment degrees
   {
-    float sx = cos((i - 90) * DEG2RAD);  // calculate pair of coordinates for segment start
+    float sx = cos((i - 90) * DEG2RAD);              // calculate pair of coordinates for segment start
     float sy = sin((i - 90) * DEG2RAD);
     uint16_t x0 = sx * (r - w) + x;
     uint16_t y0 = sy * (r - w) + y;
     uint16_t x1 = sx * r + x;
     uint16_t y1 = sy * r + y;
 
-    float sx2 = cos((i + seg - 90) * DEG2RAD);  // calculate pair of coordinates for segment end
+    float sx2 = cos((i + seg - 90) * DEG2RAD);       // calculate pair of coordinates for segment end
     float sy2 = sin((i + seg - 90) * DEG2RAD);
     int x2 = sx2 * (r - w) + x;
     int y2 = sy2 * (r - w) + y;
     int x3 = sx2 * r + x;
     int y3 = sy2 * r + y;
 
-    if (i < v) {  // fill in coloured segments with 2 triangles
+    if (i < v) {                                     // fill in coloured segments with 2 triangles
       switch (scheme) {
         case 0: colour = RED; break;                                      // fixed color
         case 1: colour = GREEN; break;                                    // fixed color
@@ -463,7 +457,7 @@ void ringMeter(int value, int vmin, int vmax, int x, int y, int r, char* units, 
       }
       tft.fillTriangle(x0, y0, x1, y1, x2, y2, colour);
       tft.fillTriangle(x1, y1, x2, y2, x3, y3, colour);
-    } else  // fill in blank segments
+    } else                                               // fill in blank segments
     {
       tft.fillTriangle(x0, y0, x1, y1, x2, y2, SCALE1);  // color of the unoccupied ring scale
       tft.fillTriangle(x1, y1, x2, y2, x3, y3, SCALE0);  // color of the unoccupied ring scale
@@ -481,19 +475,18 @@ void ringMeter(int value, int vmin, int vmax, int x, int y, int r, char* units, 
   tft.setCursor(t + 15, y);
   tft.setTextColor(GREEN);
   tft.print(tempRainbowgauge, 1);
-  //Serial.println ("...ringMeter sub complete");
 }
 
 
 // ######################################################################################
-// #  rainbow scale: 16-bit rainbow color mixer                                         #
+// #  rainbow scale: 16-bit rainbow color mixer returned to ringmeter calls             #
 // ######################################################################################
 
-unsigned int rainbow(byte value) {  // value is expected to be in range 0-127
-                                    //Serial.print( "Begin rainbow");                                                          // value is converted to a spectrum color from 0 = blue through to 127 = red
-  byte red = 0;                     // red is the top 5 bits of a 16 bit colour value
-  byte green = 0;                   // green is the middle 6 bits
-  byte blue = 0;                    // blue is the bottom 5 bits
+unsigned int rainbow(byte value) {                   // value is expected to be in range 0-127
+                                                     // value is converted to a spectrum color from 0 = blue to 127 = red
+  byte red = 0;                                      // red is the top 5 bits of a 16 bit colour value
+  byte green = 0;                                    // green is the middle 6 bits
+  byte blue = 0;                                     // blue is the bottom 5 bits
   byte quadrant = value / 32;
 
   if (quadrant == 0) {
@@ -516,19 +509,8 @@ unsigned int rainbow(byte value) {  // value is expected to be in range 0-127
     green = 63 - 2 * (value % 32);
     red = 31;
   }
-  //Serial.println("...End rainbow");
+
   return (red << 11) + (green << 5) + blue;
-}
-
-
-// ######################################################################################
-// # rainbox scale: return a value in range -1 to +1 for a given phase angle (degrees)  #
-// ######################################################################################
-
-float sineWave(int phase) {
-  //Serial.print("Begin sinewave");
-  return sin(phase * 0.0174532925);
-  //Serial.println( "...End sinewave");
 }
 
 
@@ -537,7 +519,6 @@ float sineWave(int phase) {
 // ######################################################################################
 
 void drawSaleSmallGauge() {
-  //Serial.print( "Begin drawSaleSmallGauge");
   j = 270;  // start point of cirle segment
   do {
     angleCircle = (j * DEG2RAD);  // angle expressed in radians - 1 degree = 0,01745331 radians
@@ -552,7 +533,6 @@ void drawSaleSmallGauge() {
 
     j = j + 6;
   } while (j < 356);  // end of circle segment
-  //Serial.println( "...End drawSaleSmallGauge");
 }
 
 
@@ -561,7 +541,6 @@ void drawSaleSmallGauge() {
 // ######################################################################################
 
 void needleMeter() {
-  //Serial.print( "Begin needleMeter  ");
   tft.drawLine(pivotNeedle_x, pivotNeedle_y, needle_x_old, needle_y_old, 0);  // remove old needle by overwritig in white
 
   angleNeedle = (420 * DEG2RAD - 1.5 * hum_02 * DEG2RAD);  // contains a 1.5 stretch factor to expand 60 percentage points over 90 degrees of scale
@@ -573,8 +552,7 @@ void needleMeter() {
   needle_y_old = needle_y;
 
   tft.drawLine(pivotNeedle_x, pivotNeedle_y, needle_x, needle_y, MAGENTA);
-  tft.fillCircle(pivotNeedle_x, pivotNeedle_y, 2, MAGENTA);  // restore needle pivot
-  //Serial.println ("...End needle meter");
+  tft.fillCircle(pivotNeedle_x, pivotNeedle_y, 2, MAGENTA);        // restore needle pivot
 }
 
 
@@ -583,7 +561,6 @@ void needleMeter() {
 // ######################################################################################
 
 void circleSegmentMeter() {
-  //Serial.print( "Begin circleSegmentMeter");
   tft.fillCircle(pivotHumcircle__x, pivotHumcircle__y, 34, BLACK);
   fillSegment(pivotHumcircle__x, pivotHumcircle__y, 0, (360 * hum_02 / 100), 34, TFT_BLUE);  // draw pie chart segment
   tft.drawCircle(pivotHumcircle__x, pivotHumcircle__y, 35, YELLOW);                          // correct for faulty pixels circle edge
@@ -596,36 +573,34 @@ void circleSegmentMeter() {
   tft.print(hum_02);
   tft.print("%");
   tft.setTextSize(2);
-  //Serial.println( "...End circleSegmentMeter");
 }
 
 
 // ######################################################################################
 // #  circle segment meter - draw segments                                              #
+// #                                                                                    #
+// #  x,y == coords of centre of circle                                                 #
+// #  startAngle = 0 - 359                                                              #
+// #  subAngle   = 0 - 360 = subtended angle                                            #
+// #  r = radius                                                                        #
+// #  colour = 16 bit colour value                                                      #
+// #                                                                                    #
 // ######################################################################################
 
-// x,y == coords of centre of circle
-// startAngle = 0 - 359
-// subAngle   = 0 - 360 = subtended angle
-// r = radius
-// colour = 16 bit colour value
-
 void fillSegment(int x, int y, int startAngle, int subAngle, int r, unsigned int colour) {
-  //Serial.print( "Begin fillSegment");
-  float sx = cos((startAngle - 90) * DEG2RAD);                                              // calculate first pair of coordinates for segment start
+  float sx = cos((startAngle - 90) * DEG2RAD);               // calculate first pair of coordinates for segment start
   float sy = sin((startAngle - 90) * DEG2RAD);
   uint16_t x1 = sx * r + x;
   uint16_t y1 = sy * r + y;
 
-  for (int i = startAngle; i < startAngle + subAngle; i++)                                  // draw color blocks every inc degrees 
+  for (int i = startAngle; i < startAngle + subAngle; i++)   // draw color blocks every inc degrees 
      {    
-     int x2 = cos((i + 1 - 90) * DEG2RAD) * r + x;                                          // calculate pair of coordinates for segment end
+     int x2 = cos((i + 1 - 90) * DEG2RAD) * r + x;           // calculate pair of coordinates for segment end
      int y2 = sin((i + 1 - 90) * DEG2RAD) * r + y;
      tft.fillTriangle(x1, y1, x2, y2, x, y, colour);
-     x1 = x2;                                                                               // copy segment end to segment start for next segment
+     x1 = x2;                                                // copy segment end to segment start for next segment
      y1 = y2;
      }
-  //Serial.println( "...End fillSegmyent");
 }
 
 
@@ -634,7 +609,6 @@ void fillSegment(int x, int y, int startAngle, int subAngle, int r, unsigned int
 // ######################################################################################
 
 void compassGauge() {
-  //Serial.print( "Begin compassGauge");
   tft.drawCircle((compassPivot_x + 40), (compassPivot_y + 40), compass_r + 11, BLUE);  // outer circle compass
   tft.drawCircle((compassPivot_x + 40), (compassPivot_y + 40), compass_r + 2, CYAN);   // inner circle compass - pointer fits in here
   tft.setTextSize(1);
@@ -647,7 +621,6 @@ void compassGauge() {
   tft.print("E");
   tft.setCursor(compassPivot_x + 5, compassPivot_y + 35);
   tft.print("W");
-  //Serial.println( "...End compassGauge");
 }
 
 
@@ -656,22 +629,21 @@ void compassGauge() {
 // ######################################################################################
 
 void compassPointer() {
-  //Serial.print("Begin compassPointer");
   tft.fillTriangle(c_x1_old, c_y1_old, c_x2_old, c_y2_old, c_x4_old, c_y4_old, BLACK);  // remove old compass pointer by overwritig in white
   tft.fillTriangle(c_x1_old, c_y1_old, c_x3_old, c_y3_old, c_x4_old, c_y4_old, BLACK);  // remove old compass pointer by overwritig in white
 
   compassAngle = ((windDir_01 - 90) * DEG2RAD);
 
-  c_x1 = ((compassPivot_x + 40) + (compass_r * cos(compassAngle)));  // calculate coordinates compass pointer tip
+  c_x1 = ((compassPivot_x + 40) + (compass_r * cos(compassAngle)));                     // calculate coordinates compass pointer tip
   c_y1 = ((compassPivot_y + 40) + (compass_r * sin(compassAngle)));
 
-  c_x2 = ((compassPivot_x + 40) + (compass_r * cos(compassAngle + 163 * DEG2RAD)));  // calculate coordinates compass pointer base point
+  c_x2 = ((compassPivot_x + 40) + (compass_r * cos(compassAngle + 163 * DEG2RAD)));     // calculate coordinates compass pointer base point
   c_y2 = ((compassPivot_y + 40) + (compass_r * sin(compassAngle + 163 * DEG2RAD)));
 
-  c_x3 = ((compassPivot_x + 40) + (compass_r * cos(compassAngle - 163 * DEG2RAD)));  // calculate coordinates compass pointer base point
+  c_x3 = ((compassPivot_x + 40) + (compass_r * cos(compassAngle - 163 * DEG2RAD)));     // calculate coordinates compass pointer base point
   c_y3 = ((compassPivot_y + 40) + (compass_r * sin(compassAngle - 163 * DEG2RAD)));
 
-  c_x4 = ((compassPivot_x + 40) + ((compass_r - 4) * cos(compassAngle - 180 * DEG2RAD)));  // calculate coordinates compass pointer base point
+  c_x4 = ((compassPivot_x + 40) + ((compass_r - 4) * cos(compassAngle - 180 * DEG2RAD)));// calculate coordinates compass pointer base point
   c_y4 = ((compassPivot_y + 40) + ((compass_r - 4) * sin(compassAngle - 180 * DEG2RAD)));
 
   c_x1_old = c_x1;
@@ -685,7 +657,6 @@ void compassPointer() {
 
   tft.fillTriangle(c_x1, c_y1, c_x3, c_y3, c_x4, c_y4, 0x51F2);  // was 3A72 print the new pointer to display
   tft.fillTriangle(c_x1, c_y1, c_x2, c_y2, c_x4, c_y4, BLUE);    // print the new pointer to display
-  //Serial.println( "...End compassPointer");
 }
 
 
@@ -694,7 +665,6 @@ void compassPointer() {
 // ######################################################################################
 
 void windSectorReporter() {
-  //Serial.print( "Begin windSectorReporter");
   h = 0;
   if (windDir_01 < 22.5) h = 0;
   if (windDir_01 > 22.5) h = 1;
@@ -710,5 +680,4 @@ void windSectorReporter() {
 
   tft.setCursor(210, 51);
   tft.print(sector[h]);
-  //Serial.println( "...End windSectorReporter");
 }
