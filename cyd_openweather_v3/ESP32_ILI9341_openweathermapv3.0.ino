@@ -259,7 +259,7 @@ void doTheHardWork() {
   if ((millis() - lastTime) > timerDelay) {          // the functions, no return statements.
     // Check WiFi connection status                  // so program had no return from function.  
     if (WiFi.status() == WL_CONNECTED) {             // changed to voids and also v3.0 for owm.
-      String serverPath = "https://api.openweathermap.org/data/3.0/onecall?lat=0.0&lon=0.0&exclude=minutely,hourly,daily&units=imperial&appid=yourownkeygoeshere";
+      String serverPath = "https://api.openweathermap.org/data/3.0/onecall?lat=0.0&lon=0.0&exclude=minutely,hourly,daily&units=imperial&appid=d004803e60417a6092c3c7278632beb3";
       jsonDocument = httpGETRequest(serverPath.c_str());
       JSONVar myObject = JSON.parse(jsonDocument);  // JSON.typeof(jsonVar) can be used to get the type of the var
       Serial.println(JSON.typeof(myObject));        // prints: object
