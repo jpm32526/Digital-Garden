@@ -184,6 +184,6 @@ void loop() {
 
 ## Important Notes
 
-- Make sure to update the `User_Setup.h` file in the TFT_eSPI library with the correct display driver and pin connections.
+- Make sure to update the `User_Setup.h` file in the TFT_eSPI library with the correct display driver and pin connections if you're not using an ESP32 Cheap Yellow Display – CYD (ESP32-2432S028R).
 - Insert your OpenWeatherMap API key and latitude/longitude values in the code where indicated.
 - The code refreshes the data every 15 minutes by default, adjust the `timerDelay` variable as needed.
